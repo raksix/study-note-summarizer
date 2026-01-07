@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
+import rehypeKatex from 'rehype-katex';
 import { AnalyzedFile, AnalysisStatus } from '../types';
 
 interface AnalysisCardProps {
   fileData: AnalyzedFile;
   onRemove: (id: string) => void;
-  onRetry: (id: string) => void;
+  onRetry?: (id: string) => void;
 }
 
 export const AnalysisCard: React.FC<AnalysisCardProps> = ({ fileData, onRemove, onRetry }) => {
@@ -28,37 +32,51 @@ export const AnalysisCard: React.FC<AnalysisCardProps> = ({ fileData, onRemove, 
     }
   };
 
+  // Check if this is a historical item (no file object)
+  const isHistoryItem = !fileData.file && fileData.status === AnalysisStatus.COMPLETED;
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all hover:shadow-md mb-6">
+    <div className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all hover:shadow-md mb-6 ${isHistoryItem ? 'border-blue-100' : 'border-gray-200'}`}>
       {/* Header Section */}
       <div 
         className="p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer bg-gray-50/50"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center space-x-3 overflow-hidden">
-          <div className="p-2 bg-white rounded-lg border border-gray-200 shadow-sm shrink-0">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          <div className={`p-2 rounded-lg border shadow-sm shrink-0 ${isHistoryItem ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+             <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${isHistoryItem ? 'text-blue-500' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isHistoryItem ? "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" : "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"} />
              </svg>
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-gray-800 truncate" title={fileData.file.name}>
-              {fileData.file.name}
+            <h3 className="font-semibold text-gray-800 truncate" title={fileData.fileName}>
+              {fileData.fileName}
             </h3>
             <div className="flex items-center space-x-2 mt-0.5">
-              <span className="text-xs text-gray-500">
-                {(fileData.file.size / 1024 / 1024).toFixed(2)} MB
-              </span>
-              <span className="text-gray-300">•</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${getStatusColor()}`}>
-                {getStatusText()}
-              </span>
+              {fileData.fileSize && (
+                <>
+                  <span className="text-xs text-gray-500">
+                    {(fileData.fileSize / 1024 / 1024).toFixed(2)} MB
+                  </span>
+                  <span className="text-gray-300">•</span>
+                </>
+              )}
+              {isHistoryItem && (
+                 <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 font-medium">
+                   Geçmiş Kayıt
+                 </span>
+              )}
+              {!isHistoryItem && (
+                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${getStatusColor()}`}>
+                  {getStatusText()}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         <div className="flex items-center space-x-2 ml-4">
-          {fileData.status === AnalysisStatus.ERROR && (
+          {fileData.status === AnalysisStatus.ERROR && onRetry && (
             <button 
               onClick={(e) => { e.stopPropagation(); onRetry(fileData.id); }}
               className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -92,7 +110,7 @@ export const AnalysisCard: React.FC<AnalysisCardProps> = ({ fileData, onRemove, 
 
       {/* Content Section */}
       {isExpanded && (
-        <div className="p-6 bg-gray-50/30">
+        <div className="p-6 bg-white min-h-[200px]">
           {fileData.status === AnalysisStatus.PROCESSING && (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
               <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
@@ -107,14 +125,13 @@ export const AnalysisCard: React.FC<AnalysisCardProps> = ({ fileData, onRemove, 
           )}
 
           {fileData.status === AnalysisStatus.COMPLETED && fileData.summary && (
-            <div className="prose prose-blue max-w-none">
-              {/* Using a simple pre-wrap for the markdown content, or we could use a parser. 
-                  For zero-dependency, we style the raw text nicely or use a simple formatter.
-                  Since the prompt requests Markdown, displaying it in a clean whitespace-preserving font works well for a tool-like feel.
-              */}
-              <div className="whitespace-pre-wrap text-gray-800 leading-relaxed font-sans text-sm md:text-base">
+            <div className="markdown-body">
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+              >
                 {fileData.summary}
-              </div>
+              </ReactMarkdown>
             </div>
           )}
         </div>

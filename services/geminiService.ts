@@ -14,29 +14,34 @@ export const analyzePdfDocument = async (
 ): Promise<string> => {
   const ai = getGeminiClient();
 
-  // Using gemini-3-flash-preview as recommended for basic text tasks like summarization.
   const modelId = "gemini-3-flash-preview"; 
 
   const prompt = `
-    Sen uzman bir eğitim asistanısın. Aşağıdaki PDF belgesini Türkçe olarak detaylı bir şekilde analiz et ve özetle.
-    
-    Lütfen yanıtını tam olarak şu Markdown formatında ver:
+    Sen üniversite seviyesinde bir eğitim asistanısın. Aşağıdaki PDF belgesini (ders notu, makale veya sınav sorusu olabilir) Türkçe olarak analiz et.
+
+    Biçimlendirme Kuralları:
+    1. **Latex Kullanımı**: Matematiksel formüller, denklemler veya karmaşıklık analizleri varsa (örneğin Big-O notasyonu), bunları mutlaka LaTeX formatında yaz. 
+       - Satır içi formüller için tek dolar işareti kullan: $E = mc^2$
+       - Blok formüller için çift dolar işareti kullan: $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$
+    2. **Markdown Kullanımı**: Başlıkları, listeleri ve vurgulamaları düzgün Markdown formatında yap.
+
+    Yanıt Formatı:
 
     ## 📄 Genel Bakış
-    (Buraya belgenin ne hakkında olduğuna dair 2-3 cümlelik net bir özet yaz.)
+    (Belgenin temel amacı ve kapsamı hakkında kısa özet.)
 
-    ## 🔑 Anahtar Kavramlar
-    (Buraya belgedeki en kritik terimleri ve tanımlarını madde işaretleri ile yaz.)
-    * **Kavram 1:** Tanım...
-    * **Kavram 2:** Tanım...
+    ## 🔑 Temel Kavramlar ve Tanımlar
+    (Belgede geçen en önemli terimler.)
+    * **Kavram**: Tanım
 
-    ## 🧠 Detaylı Analiz
-    (Buraya belgedeki konuların mantıksal akışına göre, ders notu niteliğinde, başlıklar kullanarak detaylı bir özet çıkar. Önemli formüller, tarihler veya kişiler varsa vurgula.)
+    ## 🧠 Detaylı Konu Analizi
+    (Belgenin içeriğini mantıksal bölümlere ayırarak derinlemesine açıkla. Varsa kod örneklerini veya algoritmaları analiz et.)
 
-    ## 🎯 Sonuç ve Öneriler
-    (Buraya bu belgeden çıkarılması gereken ana fikir ve öğrenci için çalışma tavsiyesi yaz.)
+    ## 📊 Formüller ve Hesaplamalar (Eğer Varsa)
+    (Belgede geçen önemli matematiksel bağıntıları LaTeX formatında açıkla.)
 
-    Not: Sadece belge içeriğine odaklan. Harici bilgi ekleme.
+    ## 🎯 Genel Özet ve Çalışma Tavsiyeleri
+    (Bu belgeden akılda kalması gereken en önemli 3 şey ve öğrencinin buna nasıl çalışması gerektiği.)
   `;
 
   try {
@@ -64,13 +69,50 @@ export const analyzePdfDocument = async (
   }
 };
 
+export const generateGlobalSummary = async (summaries: string[]): Promise<string> => {
+  const ai = getGeminiClient();
+  const modelId = "gemini-3-flash-preview"; 
+
+  const combinedText = summaries.join("\n\n--- DİĞER BELGE ---\n\n");
+
+  const prompt = `
+    Aşağıda farklı belgelerin özetleri bulunmaktadır. Bu özetleri birleştirerek tek bir "Bütünleşik Ders Özeti" oluştur.
+    
+    Tüm belgelerdeki ortak temaları, birbirini tamamlayan bilgileri birleştir.
+    Matematiksel ifadeler için LaTeX formatı ($...$) kullan.
+    
+    Çıktı Formatı:
+    # 📚 Bütünleşik Genel Özet
+    
+    ## 🔗 Ortak Konular ve Bağlantılar
+    (Belgeler arasındaki ilişkiler)
+
+    ## 📝 Birleştirilmiş Bilgi Özeti
+    (Tüm bilgilerin sentezi)
+
+    ## 🏆 Temel Çıkarımlar
+    (Tüm setten öğrenilmesi gerekenler)
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: {
+        parts: [{ text: prompt + "\n\n" + combinedText }]
+      }
+    });
+    return response.text || "Genel özet oluşturulamadı.";
+  } catch (error: any) {
+     throw new Error("Genel özet oluşturulurken hata oluştu.");
+  }
+};
+
 export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
       const result = reader.result as string;
-      // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
       const base64 = result.split(',')[1];
       resolve(base64);
     };
