@@ -1,0 +1,5 @@
+{
+  "name": "Ders Notu Analizörü",
+  "description": "PDF ders notlarını ve belgeleri otomatik olarak analiz eden ve özetleyen yapay zeka asistanı.",
+  "requestFramePermissions": []
+}
